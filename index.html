@@ -402,6 +402,30 @@
       </div>
     </div>
 
+    <!-- ====================================================== -->
+    <!-- MODAL DE ADVERTENCIA DE TAMAÑO (VIDEOS / FOTOS > 30MB) -->
+    <!-- ====================================================== -->
+    <div id="sizeWarningModal"
+      class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+      <div
+        class="bg-surface-container-lowest w-full max-w-sm rounded-2xl p-space-lg shadow-2xl flex flex-col items-center text-center animate-in fade-in zoom-in-95 duration-200">
+
+        <div class="w-14 h-14 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center mb-space-sm">
+          <span class="material-symbols-outlined text-[30px]">warning</span>
+        </div>
+
+        <h3 class="font-headline-sm text-headline-sm text-on-surface mb-2">Archivo demasiado grande</h3>
+        <p class="font-body-sm text-body-sm text-on-surface-variant mb-space-lg" id="sizeWarningMessage">
+          Uno o varios archivos superan el límite de 30 MB. Por favor elige videos más cortos (máximo 20 a 30 segundos) para que la subida sea rápida y exitosa.
+        </p>
+
+        <button id="closeSizeWarningBtn" type="button"
+          class="w-full py-3 rounded-xl bg-primary text-on-primary font-label-md text-label-md shadow-sm active:scale-95 transition-all cursor-pointer">
+          Entendido
+        </button>
+      </div>
+    </div>
+
     <!-- Footer Elegante -->
     <footer class="w-full py-space-lg mt-auto text-center flex flex-col items-center justify-center">
       <p class="font-body-sm text-body-sm text-outline italic tracking-wide">Boda de Andrea &amp; Keheler • Con amor</p>
@@ -458,14 +482,30 @@
     const closeModalBtn = document.getElementById('closeModalBtn');
     const modalSuccessMessage = document.getElementById('modalSuccessMessage');
 
+    const sizeWarningModal = document.getElementById('sizeWarningModal');
+    const closeSizeWarningBtn = document.getElementById('closeSizeWarningBtn');
+    const sizeWarningMessage = document.getElementById('sizeWarningMessage');
+
+    // Límite de tamaño máximo recomendado por archivo (30 MB)
+    const MAX_FILE_SIZE_MB = 30;
+
     // ==========================================================
-    // CAPTURA Y ADICIÓN DE ARCHIVOS
+    // CAPTURA Y ADICIÓN DE ARCHIVOS CON VALIDACIÓN DE TAMAÑO
     // ==========================================================
     function addFiles(newFiles) {
       if (!newFiles || newFiles.length === 0) return;
 
       const fileList = Array.from(newFiles);
+      const rejectedFiles = [];
+
       fileList.forEach(file => {
+        // Validar límite de 30 MB (especialmente para videos largos)
+        const sizeMB = file.size / (1024 * 1024);
+        if (sizeMB > MAX_FILE_SIZE_MB) {
+          rejectedFiles.push({ name: file.name, size: sizeMB.toFixed(1) });
+          return;
+        }
+
         // Evitar duplicados exactos por nombre y tamaño
         const exists = selectedFiles.some(f => f.name === file.name && f.size === file.size);
         if (!exists) {
@@ -473,7 +513,24 @@
         }
       });
 
+      // Si algún archivo superó el límite, avisar al usuario
+      if (rejectedFiles.length > 0) {
+        if (sizeWarningMessage) {
+          const names = rejectedFiles.map(f => `"${f.name}" (${f.size} MB)`).join(", ");
+          sizeWarningMessage.textContent = `El archivo ${names} supera el límite de ${MAX_FILE_SIZE_MB} MB. Para asegurar que la subida sea rápida y exitosa, por favor elige videos cortos (máximo 20 a 30 segundos) o fotos.`;
+        }
+        if (sizeWarningModal) {
+          sizeWarningModal.classList.remove('hidden');
+        }
+      }
+
       renderPreviewScreen();
+    }
+
+    if (closeSizeWarningBtn && sizeWarningModal) {
+      closeSizeWarningBtn.addEventListener('click', () => {
+        sizeWarningModal.classList.add('hidden');
+      });
     }
 
     if (fileInput) {
@@ -647,6 +704,63 @@
     };
 
     // ==========================================================
+    // COMPRESIÓN INTELIGENTE DE FOTOS EN EL NAVEGADOR
+    // Reduce fotos de 8-15 MB a ~800 KB en milisegundos sin pérdida visual
+    // ==========================================================
+    function compressImage(file, maxDimension = 2048, quality = 0.85) {
+      return new Promise((resolve) => {
+        // No comprimir si es video, gif o si ya pesa menos de 600 KB
+        if (!file.type.startsWith('image/') || file.type === 'image/gif' || file.size < 600 * 1024) {
+          resolve(file);
+          return;
+        }
+
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = (event) => {
+          const img = new Image();
+          img.src = event.target.result;
+          img.onload = () => {
+            let width = img.width;
+            let height = img.height;
+
+            // Escalar a un máximo de 2048px (resolución 2K nítida)
+            if (width > maxDimension || height > maxDimension) {
+              if (width > height) {
+                height = Math.round((height * maxDimension) / width);
+                width = maxDimension;
+              } else {
+                width = Math.round((width * maxDimension) / height);
+                height = maxDimension;
+              }
+            }
+
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
+
+            canvas.toBlob((blob) => {
+              if (blob && blob.size < file.size) {
+                const optimizedName = file.name.replace(/\.[^/.]+$/, "") + ".jpg";
+                const optimizedFile = new File([blob], optimizedName, {
+                  type: 'image/jpeg',
+                  lastModified: Date.now()
+                });
+                resolve(optimizedFile);
+              } else {
+                resolve(file);
+              }
+            }, 'image/jpeg', quality);
+          };
+          img.onerror = () => resolve(file);
+        };
+        reader.onerror = () => resolve(file);
+      });
+    }
+
+    // ==========================================================
     // FUNCIÓN PARA CONVERTIR ARCHIVO A BASE64
     // ==========================================================
     const toBase64 = file => new Promise((resolve, reject) => {
@@ -686,17 +800,25 @@
         const progressPercent = Math.round(((i) / totalFiles) * 100);
 
         confirmBtnText.textContent = `Subiendo ${i + 1} de ${totalFiles}...`;
-        uploadProgressText.textContent = `Subiendo archivo ${i + 1} de ${totalFiles}... (${file.name})`;
         uploadProgressBar.style.width = `${progressPercent}%`;
         uploadProgressPercent.textContent = `${progressPercent}%`;
 
         try {
+          // Si es foto, comprimirla inteligentemente para que suba hasta 10 veces más rápido
+          let fileToUpload = file;
+          if (file.type.startsWith('image/')) {
+            uploadProgressText.textContent = `Optimizando foto ${i + 1} de ${totalFiles}...`;
+            fileToUpload = await compressImage(file);
+          }
+
+          uploadProgressText.textContent = `Subiendo ${fileToUpload.name} (${i + 1} de ${totalFiles})...`;
+
           if (!isDemoMode) {
             // Conversión y envío real a Google Apps Script
-            const base64Data = await toBase64(file);
+            const base64Data = await toBase64(fileToUpload);
             const payload = {
-              filename: file.name,
-              mimeType: file.type || 'application/octet-stream',
+              filename: fileToUpload.name,
+              mimeType: fileToUpload.type || 'application/octet-stream',
               base64Data: base64Data.split(',')[1]
             };
 
