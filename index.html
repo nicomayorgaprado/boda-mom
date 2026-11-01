@@ -268,6 +268,25 @@
         </label>
 
       </div>
+
+      <!-- Tarjeta especial: Videos Largos (+35 MB) mediante Formulario Seguro -->
+      <a id="btn-form-videos" href="#" target="_blank" rel="noopener noreferrer"
+        class="flex items-center justify-between p-space-md rounded-xl bg-surface-container-lowest hover:bg-surface-container-low transition-all shadow-sm border border-outline-variant/30 group active:scale-[0.99] cursor-pointer">
+        <div class="flex items-center gap-space-sm min-w-0">
+          <div
+            class="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
+            <span class="material-symbols-outlined text-[22px]">video_library</span>
+          </div>
+          <div class="flex flex-col min-w-0 text-left">
+            <span class="font-label-md text-label-md text-on-surface font-semibold truncate">¿Tienes videos largos o
+              pesados?</span>
+            <span class="font-body-sm text-body-sm text-on-surface-variant truncate">Súbelos aquí mediante nuestro
+              formulario especial</span>
+          </div>
+        </div>
+        <span
+          class="material-symbols-outlined text-[18px] text-primary flex-shrink-0 group-hover:translate-x-0.5 transition-transform">open_in_new</span>
+      </a>
     </div>
 
     <!-- ====================================================== -->
@@ -414,15 +433,25 @@
           <span class="material-symbols-outlined text-[30px]">warning</span>
         </div>
 
-        <h3 class="font-headline-sm text-headline-sm text-on-surface mb-2">Archivo demasiado grande</h3>
-        <p class="font-body-sm text-body-sm text-on-surface-variant mb-space-lg" id="sizeWarningMessage">
-          Uno o varios archivos superan el límite de 30 MB. Por favor elige videos más cortos (máximo 20 a 30 segundos) para que la subida sea rápida y exitosa.
+        <h3 class="font-headline-sm text-headline-sm text-on-surface mb-2">Video demasiado grande</h3>
+        <p class="font-body-sm text-body-sm text-on-surface-variant mb-space-md" id="sizeWarningMessage">
+          Uno o varios archivos superan el límite de 35 MB para subida directa en la web. ¡Puedes subirlo sin problema
+          usando nuestro formulario especial para videos largos!
         </p>
 
-        <button id="closeSizeWarningBtn" type="button"
-          class="w-full py-3 rounded-xl bg-primary text-on-primary font-label-md text-label-md shadow-sm active:scale-95 transition-all cursor-pointer">
-          Entendido
-        </button>
+        <div class="flex flex-col gap-2 w-full">
+          <a id="btn-open-form-modal" href="#" target="_blank" rel="noopener noreferrer"
+            class="w-full py-3 rounded-xl bg-primary hover:bg-[#634a14] text-on-primary font-label-md text-label-md shadow-sm flex items-center justify-center gap-1.5 active:scale-95 transition-all cursor-pointer">
+            <span class="material-symbols-outlined text-[18px]">upload_file</span>
+            <span>Subir en Formulario de Videos</span>
+            <span class="material-symbols-outlined text-[16px]">open_in_new</span>
+          </a>
+
+          <button id="closeSizeWarningBtn" type="button"
+            class="w-full py-2.5 rounded-xl bg-surface-container-low text-on-surface-variant font-label-md text-label-md hover:bg-surface-container transition-all cursor-pointer">
+            Elegir otro archivo
+          </button>
+        </div>
       </div>
     </div>
 
@@ -438,11 +467,14 @@
   <!-- ======================================================== -->
   <script>
     // ==========================================================
-    // CONFIGURACIÓN DE GOOGLE APPS SCRIPT
+    // CONFIGURACIÓN DE ENLACES
     // ==========================================================
-    // Pega aquí la URL que obtienes al desplegar tu Web App en Google Apps Script
-    // Ejemplo: "https://script.google.com/macros/s/AKfycbx.../exec"
+    // 1. URL de tu Web App de Google Apps Script (fotos y videos hasta 35 MB):
     const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxWcFskrmusI9Pxj5qg4bdexPZkfOmXhlWBajR3vIK2k-pBmzxSII1S87MOyXzRB1ZS/exec";
+
+    // 2. PEGA AQUÍ EL ENLACE DE TU GOOGLE FORM PARA VIDEOS LARGOS (+35 MB):
+    // Ejemplo: "https://forms.gle/xyz123456789"
+    const GOOGLE_FORM_VIDEOS_URL = "https://forms.gle/1TGQaFpZ4kxur2Tr6";
 
     // ==========================================================
     // ESTADO DE LA APLICACIÓN
@@ -462,6 +494,8 @@
     const dropzone = document.getElementById('dropzone');
 
     const btnBackStep = document.getElementById('btn-back-step');
+    const btnFormVideos = document.getElementById('btn-form-videos');
+    const btnOpenFormModal = document.getElementById('btn-open-form-modal');
 
     const mediaPreviewGrid = document.getElementById('mediaPreviewGrid');
     const summaryFileCount = document.getElementById('summary-file-count');
@@ -486,8 +520,26 @@
     const closeSizeWarningBtn = document.getElementById('closeSizeWarningBtn');
     const sizeWarningMessage = document.getElementById('sizeWarningMessage');
 
-    // Límite de tamaño máximo recomendado por archivo (30 MB)
-    const MAX_FILE_SIZE_MB = 30;
+    // Límite de tamaño máximo para subida directa en la web (35 MB)
+    const MAX_FILE_SIZE_MB = 35;
+
+    // Configurar enlaces al Google Form de videos
+    function setupFormLinks() {
+      const isFormConfigured = GOOGLE_FORM_VIDEOS_URL && GOOGLE_FORM_VIDEOS_URL !== "PEGA_AQUI_EL_LINK_DE_TU_GOOGLE_FORM";
+      const targetUrl = isFormConfigured ? GOOGLE_FORM_VIDEOS_URL : "#";
+
+      [btnFormVideos, btnOpenFormModal].forEach(btn => {
+        if (!btn) return;
+        btn.href = targetUrl;
+        btn.addEventListener('click', (e) => {
+          if (!isFormConfigured) {
+            e.preventDefault();
+            alert("⚠️ Recuerda pegar el enlace de tu Google Form en la variable GOOGLE_FORM_VIDEOS_URL en index.html.");
+          }
+        });
+      });
+    }
+    setupFormLinks();
 
     // ==========================================================
     // CAPTURA Y ADICIÓN DE ARCHIVOS CON VALIDACIÓN DE TAMAÑO
@@ -499,7 +551,7 @@
       const rejectedFiles = [];
 
       fileList.forEach(file => {
-        // Validar límite de 30 MB (especialmente para videos largos)
+        // Validar límite de 35 MB (especialmente para videos en 4K)
         const sizeMB = file.size / (1024 * 1024);
         if (sizeMB > MAX_FILE_SIZE_MB) {
           rejectedFiles.push({ name: file.name, size: sizeMB.toFixed(1) });
@@ -513,11 +565,11 @@
         }
       });
 
-      // Si algún archivo superó el límite, avisar al usuario
+      // Si algún archivo superó el límite, avisar al usuario y sugerir el Form
       if (rejectedFiles.length > 0) {
         if (sizeWarningMessage) {
           const names = rejectedFiles.map(f => `"${f.name}" (${f.size} MB)`).join(", ");
-          sizeWarningMessage.textContent = `El archivo ${names} supera el límite de ${MAX_FILE_SIZE_MB} MB. Para asegurar que la subida sea rápida y exitosa, por favor elige videos cortos (máximo 20 a 30 segundos) o fotos.`;
+          sizeWarningMessage.textContent = `El video ${names} supera el límite de ${MAX_FILE_SIZE_MB} MB para subida directa. ¡Puedes subirlo sin problema usando nuestro formulario especial para videos largos!`;
         }
         if (sizeWarningModal) {
           sizeWarningModal.classList.remove('hidden');
